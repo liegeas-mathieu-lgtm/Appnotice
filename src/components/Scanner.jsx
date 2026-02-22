@@ -1,3 +1,4 @@
+export const Scanner = ({ onScanSuccess }) => {
 const captureAndRecognize = async () => {
     if (!videoRef.current || isProcessing) return;
 
@@ -44,3 +45,4 @@ const captureAndRecognize = async () => {
       setIsProcessing(false);
     }
   };
+}
