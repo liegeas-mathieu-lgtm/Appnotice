@@ -23,21 +23,23 @@ const captureAndRecognize = async () => {
     try {
       const { data: { text } } = await Tesseract.recognize(canvas, 'eng');
       
-      // 2. LOGIQUE DE FILTRAGE : On sépare les mots
-      // On cherche un mot qui a au moins 3 caractères et contient des chiffres/lettres
-      const words = text.split(/\s+/); 
-      const potentialRef = words.find(w => w.length >= 4 && /[0-9]/.test(w));
+      // 1. On nettoie les espaces et on met tout en majuscules
+      const rawText = text.toUpperCase().replace(/\s+/g, '');
 
-      if (potentialRef) {
-        const cleanRef = potentialRef.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+      // 2. LE FILTRE MAGIQUE (Regex)
+      // On cherche une séquence qui commence par des lettres (ex: SLX) 
+      // et se termine par des chiffres (ex: 1524)
+      const match = rawText.match(/[A-Z]{2,}[0-9]{3,}/);
+
+      if (match) {
+        const cleanRef = match[0]; // On ne prend QUE le morceau qui correspond au pattern
         setLiveText(cleanRef);
         
-        // Si la référence est stable, on valide
-        if (cleanRef.length >= 4) {
-           onScanSuccess(cleanRef);
-        }
+        // Si on a trouvé une référence propre, on l'envoie
+        onScanSuccess(cleanRef);
       } else {
-        setLiveText("Viser la référence...");
+        // Optionnel : afficher un aperçu tronqué si rien n'est trouvé
+        setLiveText(rawText.substring(0, 10) + "..."); 
       }
     } catch (err) {
       console.error(err);
