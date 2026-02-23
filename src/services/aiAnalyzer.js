@@ -1,50 +1,41 @@
 export const analyzeNoticeText = async (extractedText) => {
   const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-  if (!apiKey) throw new Error("Clé API absente dans Vercel.");
+  if (!apiKey) throw new Error("Clé API absente.");
 
-  // Liste des modèles à tester par ordre de probabilité en 2026
-  const modelsToTest = [
-    "gemini-2.0-flash",       // Le standard stable
-    "gemini-1.5-flash",       // Le prédécesseur universel
-    "gemini-1.5-flash-8b"     // Le modèle ultra-léger (souvent le seul en gratuit)
-  ];
+  // On utilise le modèle 1.5-flash qui est le plus compatible avec le format JSON forcé
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
 
   const payload = {
     contents: [{
       parts: [{
-        text: "Analyse ce texte et renvoie le JSON (marque, reference, pannes) : " + extractedText.substring(0, 10000)
+        text: "Analyse ce texte et renvoie UNIQUEMENT un JSON pur (pas de texte avant ou après). Format: {\"marque\": \"\", \"reference\": \"\", \"type\": \"\", \"pannes\": [{\"code\": \"\", \"label\": \"\", \"solution\": \"\"}]} \n\n Texte : " + extractedText.substring(0, 15000)
       }]
     }],
-    generationConfig: { temperature: 0.1, responseMimeType: "application/json" }
+    generationConfig: {
+      temperature: 0.1,
+      // CORRECTION : On utilise la syntaxe exacte attendue par l'API
+      response_mime_type: "application/json"
+    }
   };
 
-  // On boucle sur les modèles jusqu'à ce qu'un fonctionne
-  for (const model of modelsToTest) {
-    try {
-      console.log(`Tentative avec le modèle : ${model}...`);
-      const url = `https://generativelanguage.googleapis.com/v1/models/${model}:generateContent?key=${apiKey}`;
-      
-      const response = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
 
-      if (response.ok) {
-        const data = await response.json();
-        return JSON.parse(data.candidates[0].content.parts[0].text);
-      }
-      
-      if (response.status !== 404) {
-        // Si c'est une autre erreur que 404 (ex: 429 quota), on s'arrête
-        const errData = await response.json();
-        throw new Error(errData.error?.message || "Erreur API");
-      }
-    } catch (e) {
-      if (model === modelsToTest[modelsToTest.length - 1]) throw e;
-      // Sinon on continue la boucle
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error?.message || "Erreur de configuration API");
     }
-  }
 
-  throw new Error("Aucun modèle disponible sur votre compte Google AI.");
+    const resultText = data.candidates[0].content.parts[0].text;
+    return JSON.parse(resultText);
+
+  } catch (error) {
+    console.error("Détail erreur:", error);
+    throw new Error(`Analyse impossible : ${error.message}`);
+  }
 };
