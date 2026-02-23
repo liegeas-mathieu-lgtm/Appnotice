@@ -3,52 +3,68 @@ import * as pdfjsLib from 'pdfjs-dist';
 import { analyzeNoticeText } from '../services/aiAnalyzer';
 import { Loader2, FileText, CheckCircle, AlertCircle } from 'lucide-react';
 
-// IMPORTANT : Configuration du Worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+// VERSION CORRIGÉE DU WORKER : Utilisation du format ESM (.mjs) plus stable
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
 
 export const NoticeImporter = ({ onImportSuccess }) => {
-  const [status, setStatus] = useState('idle'); // idle, extracting, analyzing, success
-  const [debugText, setDebugText] = useState(''); // Pour voir ce qui est extrait
+  const [status, setStatus] = useState('idle'); 
+  const [debugText, setDebugText] = useState(''); 
   const [extractedData, setExtractedData] = useState(null);
 
   const processNotice = async (file) => {
+    if (!file) return;
+
+    // Vérification de l'extension pour contourner les bugs mobiles
+    const isPDF = file.name.toLowerCase().endsWith('.pdf');
+    if (!isPDF) {
+      alert("Veuillez sélectionner un fichier PDF valide.");
+      return;
+    }
+
     setStatus('extracting');
-    setDebugText('Lecture du fichier...');
+    setDebugText('Chargement du moteur de lecture PDF...');
 
     try {
       const arrayBuffer = await file.arrayBuffer();
-      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      
+      // Chargement du document
+      const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+      const pdf = await loadingTask.promise;
+      
       let fullText = "";
+      const pagesToRead = Math.min(pdf.numPages, 6); // On lit les 6 premières pages
 
-      // On lit les 5 premières pages (souvent suffisant pour les erreurs)
-      for (let i = 1; i <= Math.min(pdf.numPages, 5); i++) {
+      for (let i = 1; i <= pagesToRead; i++) {
+        setDebugText(`Lecture de la page ${i}/${pagesToRead}...`);
         const page = await pdf.getPage(i);
         const content = await page.getTextContent();
         const strings = content.items.map(item => item.str);
         fullText += strings.join(" ") + "\n";
-        setDebugText(`Extraction page ${i}/${Math.min(pdf.numPages, 5)}...`);
       }
 
-      if (fullText.trim().length < 10) {
-        throw new Error("Le PDF semble vide ou est une image (scan). L'extraction de texte a échoué.");
+      // Vérification si le texte est lisible
+      if (fullText.trim().length < 20) {
+        throw new Error("Impossible de lire le texte. Le PDF est peut-être un scan (image).");
       }
 
-      setDebugText(`Analyse par l'IA en cours... (${fullText.substring(0, 100)}...)`);
+      setDebugText(`Analyse intelligente par l'IA...`);
       setStatus('analyzing');
 
-      // 2. Appel à l'IA Gemini
+      // Envoi à l'IA Gemini
       const result = await analyzeNoticeText(fullText);
 
-      if (result) {
+      if (result && (result.marque || result.pannes)) {
         setExtractedData(result);
         setStatus('success');
       } else {
-        throw new Error("L'IA n'a pas pu structurer les données.");
+        throw new Error("L'IA n'a pas trouvé de codes d'erreurs dans ce document.");
       }
     } catch (err) {
       console.error(err);
-      setDebugText(`Erreur : ${err.message}`);
+      // On affiche l'erreur dans la zone de log pour comprendre le blocage
+      setDebugText(`ERREUR : ${err.message}`);
       setStatus('idle');
+      alert(err.message);
     }
   };
 
@@ -61,7 +77,14 @@ export const NoticeImporter = ({ onImportSuccess }) => {
               <FileText className="text-blue-600" />
             </div>
             <span className="font-bold text-gray-700">Choisir une notice PDF</span>
-            <input type="file" className="hidden" accept="*" onChange={(e) => processNotice(e.target.files[0])} />
+            <p className="text-xs text-gray-400 mt-1">L'IA extraira marque, réf et pannes</p>
+            {/* On utilise accept="*" pour forcer l'ouverture du gestionnaire de fichiers sur mobile */}
+            <input 
+              type="file" 
+              className="hidden" 
+              accept="*" 
+              onChange={(e) => processNotice(e.target.files[0])} 
+            />
           </label>
         )}
 
@@ -73,29 +96,32 @@ export const NoticeImporter = ({ onImportSuccess }) => {
         )}
 
         {status === 'success' && extractedData && (
-          <div className="text-left animate-in fade-in">
+          <div className="text-left animate-in fade-in slide-in-from-bottom-4">
             <div className="flex items-center gap-2 text-green-600 mb-4 font-bold">
-              <CheckCircle size={20} /> Analyse terminée !
+              <CheckCircle size={20} /> Analyse réussie !
             </div>
-            <div className="bg-gray-50 p-4 rounded-2xl text-sm space-y-2 mb-4">
+            <div className="bg-blue-50 p-4 rounded-2xl text-sm space-y-2 mb-4 border border-blue-100">
               <p><strong>Marque :</strong> {extractedData.marque}</p>
-              <p><strong>Réf :</strong> {extractedData.reference}</p>
-              <p><strong>Pannes trouvées :</strong> {extractedData.pannes?.length || 0}</p>
+              <p><strong>Modèle :</strong> {extractedData.reference}</p>
+              <p><strong>Type :</strong> {extractedData.type}</p>
+              <p className="text-blue-600 font-bold italic">
+                {extractedData.pannes?.length || 0} pannes détectées
+              </p>
             </div>
             <button 
               onClick={() => onImportSuccess(extractedData)}
-              className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold"
+              className="w-full bg-blue-600 text-white py-4 rounded-2xl font-bold shadow-lg shadow-blue-200"
             >
-              Valider et Enregistrer
+              Importer dans ma base
             </button>
           </div>
         )}
       </div>
 
-      {/* ZONE DE LOGS (Optionnel pour voir si ça avance) */}
+      {/* ZONE DE DEBUG VISUELLE */}
       {debugText && status !== 'success' && (
-        <div className="bg-gray-800 text-green-400 p-3 rounded-xl text-[10px] font-mono overflow-hidden">
-          {debugText}
+        <div className="bg-gray-900 text-green-400 p-3 rounded-xl text-[10px] font-mono border border-gray-700">
+          <span className="opacity-50">Log:</span> {debugText}
         </div>
       )}
     </div>
