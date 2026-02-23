@@ -15,15 +15,22 @@ export const NoticeImporter = ({ onImportSuccess }) => {
       <label className="w-full bg-green-600 text-white font-bold py-4 px-6 rounded-2xl shadow-lg hover:bg-green-700 active:scale-95 transition-all cursor-pointer flex items-center justify-center gap-2">
         <FileText size={20} />
         Choisir le fichier PDF
-        <input 
+       <input 
   type="file" 
   className="hidden" 
-  accept=".pdf,application/pdf" // Spécifie bien l'extension ET le type MIME
+  /* On enlève tout ce qui ressemble à une image pour forcer le sélecteur de documents */
+  accept="application/pdf"
+  /* Désactive toute tentative d'ouverture directe de la caméra */
+  capture={false} 
   onChange={(e) => {
     const file = e.target.files[0];
     if (file) {
-      console.log("Fichier sélectionné :", file.name);
-      processNotice(file); // La fonction qui lance l'analyse
+      // Vérification de sécurité pour être sûr que c'est un PDF
+      if (file.type !== "application/pdf") {
+        alert("Veuillez sélectionner un fichier PDF uniquement.");
+        return;
+      }
+      processNotice(file);
     }
   }} 
 />
