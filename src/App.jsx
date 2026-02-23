@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { Camera, Search, AlertCircle, X, FileText, UploadCloud } from 'lucide-react';
+import { Camera, Search, AlertCircle, X, UploadCloud } from 'lucide-react';
 import { Scanner } from './components/Scanner';
 import { Diagnostic } from './components/Diagnostic';
 import { AddProductForm } from './components/AddProductForm';
-import { NoticeImporter } from './components/NoticeImporter'; // Nouveau composant
+import { NoticeImporter } from './components/NoticeImporter';
 import { fetchDiagnosticByRef } from './services/diagnostic';
 
 function App() {
@@ -14,6 +14,7 @@ function App() {
   const [notFoundRef, setNotFoundRef] = useState(null);
   const [manualSearch, setManualSearch] = useState('');
 
+  // Gère la recherche par scan ou saisie manuelle
   const handleScan = async (text) => {
     if (!text) return;
     setLoading(true);
@@ -36,6 +37,7 @@ function App() {
     }
   };
 
+  // Réinitialise l'interface
   const resetAll = () => {
     setData(null);
     setNotFoundRef(null);
@@ -54,16 +56,16 @@ function App() {
       <main className="flex-1 p-6 max-w-lg mx-auto w-full pb-24">
         {loading && (
           <div className="fixed inset-0 bg-white/80 backdrop-blur-sm z-50 flex items-center justify-center">
-            <div className="text-blue-600 font-bold flex flex-col items-center">
+            <div className="text-blue-600 font-bold flex flex-col items-center text-center px-6">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
-              Analyse en cours...
+              <p className="text-lg">Analyse intelligente en cours...</p>
+              <p className="text-sm text-gray-500 font-normal mt-2">Gemini 3 Flash explore le document et sauvegarde le fichier.</p>
             </div>
           </div>
         )}
 
         {/* AFFICHAGE DES ONGLETS */}
         {activeTab === 'scan' ? (
-          /* SECTION SCANNER ET RECHERCHE */
           <div className="space-y-6">
             {data ? (
               <Diagnostic data={data} onReset={resetAll} />
@@ -114,7 +116,7 @@ function App() {
                     <Camera className="text-blue-600" size={40} />
                   </div>
                   <h2 className="text-2xl font-bold mb-2 text-gray-800">Scanner la plaque</h2>
-                  <p className="text-gray-500 mb-8 text-sm">Pointez le cadre rouge vers la référence du moteur.</p>
+                  <p className="text-gray-500 mb-8 text-sm">Identifiez instantanément le matériel et ses codes erreurs.</p>
                   <button 
                     onClick={() => setShowScanner(true)}
                     className="w-full bg-blue-600 text-white font-bold py-4 rounded-2xl shadow-lg hover:bg-blue-700 active:scale-95 transition-all"
@@ -126,9 +128,10 @@ function App() {
             )}
           </div>
         ) : (
-          /* SECTION IMPORTATION DE NOTICE (V2) */
+          /* SECTION IMPORTATION DE NOTICE (V3 - Gemini 2026) */
           <div className="animate-in slide-in-from-right duration-300">
             <NoticeImporter onImportSuccess={(extractedData) => {
+              // Une fois l'IA et l'upload terminés, on bascule sur l'onglet Diagnostic
               setActiveTab('scan');
               setData(extractedData);
             }} />
@@ -140,7 +143,7 @@ function App() {
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex justify-around items-center p-3 z-40 pb-6 shadow-[0_-4px_10px_rgba(0,0,0,0.05)]">
         <button 
           onClick={() => { resetAll(); setActiveTab('scan'); }}
-          className={`flex flex-col items-center gap-1 transition-colors ${activeTab === 'scan' ? 'text-blue-600' : 'text-gray-400'}`}
+          className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'scan' ? 'text-blue-600 scale-110' : 'text-gray-400'}`}
         >
           <Camera size={24} strokeWidth={activeTab === 'scan' ? 2.5 : 2} />
           <span className="text-[10px] font-bold uppercase tracking-wider">Scanner</span>
@@ -148,10 +151,10 @@ function App() {
 
         <button 
           onClick={() => { resetAll(); setActiveTab('import'); }}
-          className={`flex flex-col items-center gap-1 transition-colors ${activeTab === 'import' ? 'text-blue-600' : 'text-gray-400'}`}
+          className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'import' ? 'text-blue-600 scale-110' : 'text-gray-400'}`}
         >
           <UploadCloud size={24} strokeWidth={activeTab === 'import' ? 2.5 : 2} />
-          <span className="text-[10px] font-bold uppercase tracking-wider">Importer</span>
+          <span className="text-[10px] font-bold uppercase tracking-wider">Notice IA</span>
         </button>
       </div>
 

@@ -15,16 +15,16 @@ export const analyzeNoticeText = async (extractedText) => {
     const response = await ai.models.generateContent({
       // Utilisation du modèle spécifique 2026
       model: "gemini-3-flash-preview", 
-      contents: `Tu es un expert en maintenance. Analyse ce texte de notice technique et renvoie UNIQUEMENT un JSON pur.
-      Format attendu :
-      {
-        "marque": "...",
-        "reference": "...",
-        "type": "...",
-        "pannes": [{"code": "...", "label": "...", "solution": "..."}]
-      }
-      
-      Texte à analyser : ${extractedText.substring(0, 20000)}`,
+      // Dans aiAnalyzer.js, modifie le texte envoyé à Gemini :
+contents: `Tu es un expert en dépannage de portails motorisés. 
+Analyse attentivement cette notice technique. 
+1. Identifie la marque et le modèle.
+2. Cherche tous les codes erreurs, les clignotements de LED ou les tableaux de diagnostic.
+3. Renvoie un JSON pur. Si tu ne trouves pas de codes précis, liste les opérations d'entretien ou de sécurité mentionnées.
+
+Format : {"marque": "...", "reference": "...", "type": "...", "pannes": [{"code": "...", "label": "...", "solution": "..."}]}
+
+Texte : ${extractedText.substring(0, 25000)}`,
       config: {
         // Activation du nouveau moteur de réflexion de Gemini 3
         thinkingLevel: "medium", 
