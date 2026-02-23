@@ -1,17 +1,13 @@
 export const analyzeNoticeText = async (extractedText) => {
   const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
 
-  if (!apiKey) {
-    throw new Error("Clé API manquante dans Vercel.");
-  }
-
-  // ON TENTE LA VERSION V1 (STABLE) AU LIEU DE V1BETA
-  const url = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+  // L'URL la plus simple possible que Google accepte partout
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
 
   const payload = {
     contents: [{
       parts: [{
-        text: "Extrait les pannes de ce texte et réponds en JSON pur. Format: {\"marque\":\"\", \"reference\":\"\", \"type\":\"\", \"pannes\":[{\"code\":\"\", \"label\":\"\", \"solution\":\"\"}]} \n\n Texte : " + extractedText.substring(0, 10000)
+        text: "Analyse ce texte et donne les pannes en JSON : " + extractedText.substring(0, 10000)
       }]
     }]
   };
@@ -23,33 +19,18 @@ export const analyzeNoticeText = async (extractedText) => {
       body: JSON.stringify(payload)
     });
 
-    // Si la V1 renvoie encore 404, on tente automatiquement la V1BETA
-    if (response.status === 404) {
-      const urlBeta = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
-      const responseBeta = await fetch(urlBeta, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-      
-      if (!responseBeta.ok) throw new Error(`Erreur API ${responseBeta.status}`);
-      const data = await responseBeta.json();
-      return JSON.parse(data.candidates[0].content.parts[0].text.replace(/```json|```/g, ""));
-    }
-
     if (!response.ok) {
-      throw new Error(`Erreur API ${response.status}`);
+      // Si ça fait encore 404, c'est que le nom du modèle est refusé
+      const err = await response.json();
+      throw new Error(`Code ${response.status} : ${err.error?.message || 'Modèle non trouvé'}`);
     }
 
     const data = await response.json();
-    let resultText = data.candidates[0].content.parts[0].text;
-    
-    // Nettoyage au cas où l'IA met des balises ```json
-    resultText = resultText.replace(/```json|```/g, "").trim();
-    
-    return JSON.parse(resultText);
+    let text = data.candidates[0].content.parts[0].text;
+    text = text.replace(/```json|```/g, "").trim();
+    return JSON.parse(text);
 
   } catch (error) {
-    throw new Error(`Échec : ${error.message}. Vérifiez que le modèle Gemini 1.5 Flash est activé pour cette clé.`);
+    throw new Error(error.message);
   }
 };
