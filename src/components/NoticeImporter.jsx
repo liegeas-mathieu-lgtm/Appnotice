@@ -3,6 +3,7 @@ import { UploadCloud, FileText } from 'lucide-react';
 
 export const NoticeImporter = ({ onImportSuccess }) => {
   return (
+    
     <div className="bg-white p-8 rounded-3xl shadow-xl text-center border border-gray-100 animate-in fade-in duration-500">
       <div className="bg-green-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
         <UploadCloud className="text-green-600" size={40} />
@@ -18,12 +19,22 @@ export const NoticeImporter = ({ onImportSuccess }) => {
     <span>Sélectionner la notice</span>
   </div>
   <span className="text-[10px] opacity-80 uppercase tracking-tighter">(PDF uniquement)</span>
-  <input 
-    type="file" 
-    className="hidden" 
-    accept="application/pdf"
-    onChange={(e) => processNotice(e.target.files[0])} 
-  />
+ <input 
+  key="pdf-input" // Une clé unique force React à restituer l'élément proprement
+  type="file" 
+  className="hidden" 
+  accept="application/pdf"
+  id="file-upload"
+  /* Supprime toute trace de 'capture' pour ne pas déclencher l'appareil photo */
+  onChange={(e) => {
+    const file = e.target.files[0];
+    if (file && file.type === "application/pdf") {
+      processNotice(file);
+    } else if (file) {
+      alert("Ce fichier n'est pas un PDF.");
+    }
+  }} 
+/>
 </label>
     </div>
   );
