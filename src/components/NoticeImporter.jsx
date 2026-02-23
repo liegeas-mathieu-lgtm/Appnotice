@@ -12,29 +12,19 @@ export const NoticeImporter = ({ onImportSuccess }) => {
         Sélectionnez un PDF pour que l'IA remplisse automatiquement la fiche moteur.
       </p>
 
-      <label className="w-full bg-green-600 text-white font-bold py-4 px-6 rounded-2xl shadow-lg hover:bg-green-700 active:scale-95 transition-all cursor-pointer flex items-center justify-center gap-2">
-        <FileText size={20} />
-        Choisir le fichier PDF
-       <input 
-  type="file" 
-  className="hidden" 
-  /* On enlève tout ce qui ressemble à une image pour forcer le sélecteur de documents */
-  accept="application/pdf"
-  /* Désactive toute tentative d'ouverture directe de la caméra */
-  capture={false} 
-  onChange={(e) => {
-    const file = e.target.files[0];
-    if (file) {
-      // Vérification de sécurité pour être sûr que c'est un PDF
-      if (file.type !== "application/pdf") {
-        alert("Veuillez sélectionner un fichier PDF uniquement.");
-        return;
-      }
-      processNotice(file);
-    }
-  }} 
-/>
-      </label>
+      <label className="w-full bg-green-600 text-white font-bold py-4 px-6 rounded-2xl shadow-lg hover:bg-green-700 active:scale-95 transition-all cursor-pointer flex flex-col items-center justify-center gap-1">
+  <div className="flex items-center gap-2">
+    <FileText size={20} />
+    <span>Sélectionner la notice</span>
+  </div>
+  <span className="text-[10px] opacity-80 uppercase tracking-tighter">(PDF uniquement)</span>
+  <input 
+    type="file" 
+    className="hidden" 
+    accept="application/pdf"
+    onChange={(e) => processNotice(e.target.files[0])} 
+  />
+</label>
     </div>
   );
 };
