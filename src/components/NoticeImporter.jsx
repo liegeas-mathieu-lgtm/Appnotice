@@ -3,10 +3,9 @@ import * as pdfjsLib from 'pdfjs-dist';
 import { analyzeNoticeText } from '../services/aiAnalyzer';
 import { Loader2, FileText, CheckCircle } from 'lucide-react';
 
-// --- NOUVELLE MÉTHODE LOCALE POUR LE WORKER ---
-// On importe le worker comme une URL gérée par Vite
-import pdfWorker from 'pdfjs-dist/build/pdf.worker.mjs?url';
-pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
+// Utilisation d'un lien CDN spécifique qui inclut tous les patchs de compatibilité
+// On utilise la version "legacy" pour éviter l'erreur .toHex
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/legacy/build/pdf.worker.min.mjs`;
 
 export const NoticeImporter = ({ onImportSuccess }) => {
   const [status, setStatus] = useState('idle'); 
