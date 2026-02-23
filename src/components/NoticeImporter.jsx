@@ -20,18 +20,23 @@ export const NoticeImporter = ({ onImportSuccess }) => {
   </div>
   <span className="text-[10px] opacity-80 uppercase tracking-tighter">(PDF uniquement)</span>
  <input 
-  key="pdf-input" // Une clé unique force React à restituer l'élément proprement
+  key="universal-input"
   type="file" 
   className="hidden" 
-  accept="*"
-  id="file-upload"
-  /* Supprime toute trace de 'capture' pour ne pas déclencher l'appareil photo */
+  accept="*" // On laisse tout ouvert pour forcer l'apparition du menu "Fichiers"
   onChange={(e) => {
     const file = e.target.files[0];
-    if (file && file.type === "*") {
-      processNotice(file);
-    } else if (file) {
-      alert("Ce fichier n'est pas un PDF.");
+    if (!file) return;
+
+    // On vérifie l'extension nous-mêmes car le téléphone est capricieux
+    const isPDF = file.name.toLowerCase().endsWith('.pdf');
+
+    if (isPDF) {
+      processNotice(file); // On lance l'analyse
+    } else {
+      alert("⚠️ Erreur : Veuillez choisir un document PDF. Les photos ne sont pas acceptées pour l'analyse.");
+      // On vide l'input pour pouvoir réessayer
+      e.target.value = "";
     }
   }} 
 />
