@@ -23,12 +23,12 @@ export const NoticeImporter = ({ onImportSuccess }) => {
   key="pdf-input" // Une clé unique force React à restituer l'élément proprement
   type="file" 
   className="hidden" 
-  accept="application/pdf"
+  accept="*"
   id="file-upload"
   /* Supprime toute trace de 'capture' pour ne pas déclencher l'appareil photo */
   onChange={(e) => {
     const file = e.target.files[0];
-    if (file && file.type === "application/pdf") {
+    if (file && file.type === "*") {
       processNotice(file);
     } else if (file) {
       alert("Ce fichier n'est pas un PDF.");
