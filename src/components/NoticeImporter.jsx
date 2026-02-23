@@ -16,11 +16,17 @@ export const NoticeImporter = ({ onImportSuccess }) => {
         <FileText size={20} />
         Choisir le fichier PDF
         <input 
-          type="file" 
-          className="hidden" 
-          accept="application/pdf"
-          onChange={(e) => console.log("Fichier prêt :", e.target.files[0])} 
-        />
+  type="file" 
+  className="hidden" 
+  accept=".pdf,application/pdf" // Spécifie bien l'extension ET le type MIME
+  onChange={(e) => {
+    const file = e.target.files[0];
+    if (file) {
+      console.log("Fichier sélectionné :", file.name);
+      processNotice(file); // La fonction qui lance l'analyse
+    }
+  }} 
+/>
       </label>
     </div>
   );
