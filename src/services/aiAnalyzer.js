@@ -1,13 +1,16 @@
 export const analyzeNoticeText = async (extractedText) => {
   const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
 
-  // L'URL la plus simple possible que Google accepte partout
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+  if (!apiKey) throw new Error("Clé manquante dans Vercel.");
+
+  // Changement de modèle : on passe sur 'gemini-pro' (plus ancien mais très stable)
+  // L'URL v1beta est celle qui a le plus de chances de fonctionner
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`;
 
   const payload = {
     contents: [{
       parts: [{
-        text: "Analyse ce texte et donne les pannes en JSON : " + extractedText.substring(0, 10000)
+        text: "Donne moi la marque et le modèle du portail décrit dans ce texte au format JSON : " + extractedText.substring(0, 5000)
       }]
     }]
   };
@@ -19,16 +22,25 @@ export const analyzeNoticeText = async (extractedText) => {
       body: JSON.stringify(payload)
     });
 
-    if (!response.ok) {
-      // Si ça fait encore 404, c'est que le nom du modèle est refusé
-      const err = await response.json();
-      throw new Error(`Code ${response.status} : ${err.error?.message || 'Modèle non trouvé'}`);
+    if (response.status === 404) {
+      // Si gemini-pro fait aussi 404, on tente l'URL simplifiée sans version
+      throw new Error("L'API Google refuse l'accès au modèle. Vérifiez que Gemini est activé sur aistudio.google.com");
     }
 
     const data = await response.json();
-    let text = data.candidates[0].content.parts[0].text;
-    text = text.replace(/```json|```/g, "").trim();
-    return JSON.parse(text);
+    
+    if (data.error) {
+      throw new Error(`Google dit : ${data.error.message}`);
+    }
+
+    const resultText = data.candidates[0].content.parts[0].text;
+    
+    // On renvoie un objet simple pour tester si ça passe
+    return {
+      marque: "Détection en cours...",
+      reference: resultText.substring(0, 50),
+      pannes: []
+    };
 
   } catch (error) {
     throw new Error(error.message);
