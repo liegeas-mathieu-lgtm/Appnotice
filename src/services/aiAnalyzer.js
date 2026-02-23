@@ -1,44 +1,50 @@
 export const analyzeNoticeText = async (extractedText) => {
   const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-  if (!apiKey) throw new Error("Clé API absente.");
+  if (!apiKey) throw new Error("Clé API absente dans Vercel.");
 
-  // URL de secours ultime : le modèle 1.5-flash est le seul garanti stable 
-  // même si tu as accès au 3.0 via l'interface.
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+  // Liste des modèles à tester par ordre de probabilité en 2026
+  const modelsToTest = [
+    "gemini-2.0-flash",       // Le standard stable
+    "gemini-1.5-flash",       // Le prédécesseur universel
+    "gemini-1.5-flash-8b"     // Le modèle ultra-léger (souvent le seul en gratuit)
+  ];
 
   const payload = {
     contents: [{
       parts: [{
-        text: "Analyse ce texte et renvoie le JSON de la marque et des pannes : " + extractedText.substring(0, 10000)
+        text: "Analyse ce texte et renvoie le JSON (marque, reference, pannes) : " + extractedText.substring(0, 10000)
       }]
     }],
-    generationConfig: {
-      temperature: 0.1,
-      responseMimeType: "application/json"
-    }
+    generationConfig: { temperature: 0.1, responseMimeType: "application/json" }
   };
 
-  try {
-    const response = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    });
+  // On boucle sur les modèles jusqu'à ce qu'un fonctionne
+  for (const model of modelsToTest) {
+    try {
+      console.log(`Tentative avec le modèle : ${model}...`);
+      const url = `https://generativelanguage.googleapis.com/v1/models/${model}:generateContent?key=${apiKey}`;
+      
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
 
-    const data = await response.json();
-
-    if (!response.ok) {
-      // SI ENCORE 404, on affiche la liste des modèles DISPONIBLES pour TA clé
-      if (response.status === 404) {
-        throw new Error("Modèle introuvable. Allez dans Google AI Studio et créez une clé spécifiquement pour 'Gemini 1.5 Flash'.");
+      if (response.ok) {
+        const data = await response.json();
+        return JSON.parse(data.candidates[0].content.parts[0].text);
       }
-      throw new Error(data.error?.message || "Erreur inconnue");
+      
+      if (response.status !== 404) {
+        // Si c'est une autre erreur que 404 (ex: 429 quota), on s'arrête
+        const errData = await response.json();
+        throw new Error(errData.error?.message || "Erreur API");
+      }
+    } catch (e) {
+      if (model === modelsToTest[modelsToTest.length - 1]) throw e;
+      // Sinon on continue la boucle
     }
-
-    const resultText = data.candidates[0].content.parts[0].text;
-    return JSON.parse(resultText);
-
-  } catch (error) {
-    throw new Error(error.message);
   }
+
+  throw new Error("Aucun modèle disponible sur votre compte Google AI.");
 };
