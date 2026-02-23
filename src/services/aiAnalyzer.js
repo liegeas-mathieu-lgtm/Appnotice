@@ -9,7 +9,8 @@ export const analyzeNoticeText = async (extractedText) => {
   }
 
   // Utilisation de gemini-1.5-flash (le plus rapide et compatible)
-  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+  // Remplace la ligne existante par celle-ci :
+const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
 
   const prompt = `
     Tu es un expert en motorisation de portail. Analyse ce texte de notice technique.
