@@ -2,20 +2,16 @@ export const analyzeNoticeText = async (extractedText) => {
   const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
   if (!apiKey) throw new Error("Clé API absente.");
 
-  // On utilise le modèle 1.5-flash qui est le plus compatible avec le format JSON forcé
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+  // On utilise l'alias 'latest' qui pointe vers le modèle actif de ton compte
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`;
 
   const payload = {
     contents: [{
       parts: [{
-        text: "Analyse ce texte et renvoie UNIQUEMENT un JSON pur (pas de texte avant ou après). Format: {\"marque\": \"\", \"reference\": \"\", \"type\": \"\", \"pannes\": [{\"code\": \"\", \"label\": \"\", \"solution\": \"\"}]} \n\n Texte : " + extractedText.substring(0, 15000)
+        text: "Tu es un assistant technique. Analyse ce texte et réponds UNIQUEMENT par un objet JSON respectant ce format : {\"marque\": \"\", \"reference\": \"\", \"type\": \"\", \"pannes\": [{\"code\": \"\", \"label\": \"\", \"solution\": \"\"}]}. Voici le texte : " + extractedText.substring(0, 10000)
       }]
-    }],
-    generationConfig: {
-      temperature: 0.1,
-      // CORRECTION : On utilise la syntaxe exacte attendue par l'API
-      response_mime_type: "application/json"
-    }
+    }]
+    // On a supprimé generationConfig pour éviter toute erreur de champ inconnu
   };
 
   try {
@@ -28,14 +24,17 @@ export const analyzeNoticeText = async (extractedText) => {
     const data = await response.json();
 
     if (!response.ok) {
-      throw new Error(data.error?.message || "Erreur de configuration API");
+      throw new Error(data.error?.message || "Erreur API");
     }
 
-    const resultText = data.candidates[0].content.parts[0].text;
+    let resultText = data.candidates[0].content.parts[0].text;
+    
+    // Nettoyage manuel du JSON au cas où Gemini ajoute des balises ```json
+    resultText = resultText.replace(/```json/g, "").replace(/```/g, "").trim();
+    
     return JSON.parse(resultText);
 
   } catch (error) {
-    console.error("Détail erreur:", error);
-    throw new Error(`Analyse impossible : ${error.message}`);
+    throw new Error(`Erreur : ${error.message}`);
   }
 };
