@@ -1,18 +1,27 @@
 export const analyzeNoticeText = async (extractedText) => {
   const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+  if (!apiKey) throw new Error("Clé API absente dans Vercel.");
 
-  if (!apiKey) throw new Error("Clé manquante dans Vercel.");
-
-  // Changement de modèle : on passe sur 'gemini-pro' (plus ancien mais très stable)
-  // L'URL v1beta est celle qui a le plus de chances de fonctionner
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`;
+  // URL mise à jour pour le modèle Gemini 3 Flash
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash:generateContent?key=${apiKey}`;
 
   const payload = {
     contents: [{
       parts: [{
-        text: "Donne moi la marque et le modèle du portail décrit dans ce texte au format JSON : " + extractedText.substring(0, 5000)
+        text: `Tu es un expert en maintenance industrielle. Analyse ce texte technique et extrait les informations suivantes en JSON pur :
+        {
+          "marque": "NOM",
+          "reference": "MODELE",
+          "type": "Coulissant/Battant/Garage",
+          "pannes": [{"code": "CODE", "label": "DESCRIPTION", "solution": "ACTION"}]
+        }
+        Texte : ${extractedText.substring(0, 20000)}`
       }]
-    }]
+    }],
+    generationConfig: {
+      temperature: 0.1,
+      responseMimeType: "application/json"
+    }
   };
 
   try {
@@ -22,27 +31,18 @@ export const analyzeNoticeText = async (extractedText) => {
       body: JSON.stringify(payload)
     });
 
-    if (response.status === 404) {
-      // Si gemini-pro fait aussi 404, on tente l'URL simplifiée sans version
-      throw new Error("L'API Google refuse l'accès au modèle. Vérifiez que Gemini est activé sur aistudio.google.com");
-    }
-
     const data = await response.json();
-    
-    if (data.error) {
-      throw new Error(`Google dit : ${data.error.message}`);
+
+    if (!response.ok) {
+      throw new Error(`Erreur API ${response.status} : ${data.error?.message || 'Modèle non supporté'}`);
     }
 
+    // Extraction directe de la réponse JSON de Gemini 3
     const resultText = data.candidates[0].content.parts[0].text;
-    
-    // On renvoie un objet simple pour tester si ça passe
-    return {
-      marque: "Détection en cours...",
-      reference: resultText.substring(0, 50),
-      pannes: []
-    };
+    return JSON.parse(resultText);
 
   } catch (error) {
-    throw new Error(error.message);
+    console.error("Erreur Gemini 3:", error);
+    throw new Error(`Échec de l'analyse : ${error.message}`);
   }
 };
