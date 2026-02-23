@@ -2,20 +2,16 @@ export const analyzeNoticeText = async (extractedText) => {
   const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
   if (!apiKey) throw new Error("Clé API absente dans Vercel.");
 
-  // URL mise à jour pour le modèle Gemini 3 Flash
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash:generateContent?key=${apiKey}`;
+  // On essaie le modèle 2.0 Flash qui est le standard actuel pour les développeurs
+  const modelName = "gemini-2.0-flash";
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
 
   const payload = {
     contents: [{
       parts: [{
-        text: `Tu es un expert en maintenance industrielle. Analyse ce texte technique et extrait les informations suivantes en JSON pur :
-        {
-          "marque": "NOM",
-          "reference": "MODELE",
-          "type": "Coulissant/Battant/Garage",
-          "pannes": [{"code": "CODE", "label": "DESCRIPTION", "solution": "ACTION"}]
-        }
-        Texte : ${extractedText.substring(0, 20000)}`
+        text: `Tu es un expert en maintenance. Analyse ce texte et renvoie UNIQUEMENT un JSON pur.
+        Format : {"marque": "...", "reference": "...", "type": "...", "pannes": [{"code": "...", "label": "...", "solution": "..."}]}
+        Texte : ${extractedText.substring(0, 15000)}`
       }]
     }],
     generationConfig: {
@@ -34,15 +30,25 @@ export const analyzeNoticeText = async (extractedText) => {
     const data = await response.json();
 
     if (!response.ok) {
-      throw new Error(`Erreur API ${response.status} : ${data.error?.message || 'Modèle non supporté'}`);
+      // Si le 2.0 renvoie 404, on tente le 1.5-flash par sécurité
+      if (response.status === 404) {
+         const fallbackUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+         const fallbackRes = await fetch(fallbackUrl, {
+           method: "POST",
+           headers: { "Content-Type": "application/json" },
+           body: JSON.stringify(payload)
+         });
+         const fallbackData = await fallbackRes.json();
+         if (!fallbackRes.ok) throw new Error("Aucun modèle Gemini trouvé (404).");
+         return JSON.parse(fallbackData.candidates[0].content.parts[0].text);
+      }
+      throw new Error(data.error?.message || "Erreur API");
     }
 
-    // Extraction directe de la réponse JSON de Gemini 3
-    const resultText = data.candidates[0].content.parts[0].text;
-    return JSON.parse(resultText);
+    return JSON.parse(data.candidates[0].content.parts[0].text);
 
   } catch (error) {
-    console.error("Erreur Gemini 3:", error);
-    throw new Error(`Échec de l'analyse : ${error.message}`);
+    console.error("Erreur d'analyse:", error);
+    throw new Error(`Échec : ${error.message}`);
   }
 };
