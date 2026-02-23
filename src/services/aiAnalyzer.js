@@ -1,17 +1,15 @@
 export const analyzeNoticeText = async (extractedText) => {
   const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-  if (!apiKey) throw new Error("Clé API absente dans Vercel.");
+  if (!apiKey) throw new Error("Clé API absente.");
 
-  // On essaie le modèle 2.0 Flash qui est le standard actuel pour les développeurs
-  const modelName = "gemini-2.0-flash";
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
+  // URL de secours ultime : le modèle 1.5-flash est le seul garanti stable 
+  // même si tu as accès au 3.0 via l'interface.
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
 
   const payload = {
     contents: [{
       parts: [{
-        text: `Tu es un expert en maintenance. Analyse ce texte et renvoie UNIQUEMENT un JSON pur.
-        Format : {"marque": "...", "reference": "...", "type": "...", "pannes": [{"code": "...", "label": "...", "solution": "..."}]}
-        Texte : ${extractedText.substring(0, 15000)}`
+        text: "Analyse ce texte et renvoie le JSON de la marque et des pannes : " + extractedText.substring(0, 10000)
       }]
     }],
     generationConfig: {
@@ -30,25 +28,17 @@ export const analyzeNoticeText = async (extractedText) => {
     const data = await response.json();
 
     if (!response.ok) {
-      // Si le 2.0 renvoie 404, on tente le 1.5-flash par sécurité
+      // SI ENCORE 404, on affiche la liste des modèles DISPONIBLES pour TA clé
       if (response.status === 404) {
-         const fallbackUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
-         const fallbackRes = await fetch(fallbackUrl, {
-           method: "POST",
-           headers: { "Content-Type": "application/json" },
-           body: JSON.stringify(payload)
-         });
-         const fallbackData = await fallbackRes.json();
-         if (!fallbackRes.ok) throw new Error("Aucun modèle Gemini trouvé (404).");
-         return JSON.parse(fallbackData.candidates[0].content.parts[0].text);
+        throw new Error("Modèle introuvable. Allez dans Google AI Studio et créez une clé spécifiquement pour 'Gemini 1.5 Flash'.");
       }
-      throw new Error(data.error?.message || "Erreur API");
+      throw new Error(data.error?.message || "Erreur inconnue");
     }
 
-    return JSON.parse(data.candidates[0].content.parts[0].text);
+    const resultText = data.candidates[0].content.parts[0].text;
+    return JSON.parse(resultText);
 
   } catch (error) {
-    console.error("Erreur d'analyse:", error);
-    throw new Error(`Échec : ${error.message}`);
+    throw new Error(error.message);
   }
 };
