@@ -1,40 +1,47 @@
+import { GoogleGenAI } from "@google/genai";
+
+// Récupération de la clé depuis les variables d'environnement de Vercel
+const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+
+// Initialisation du nouveau SDK Gemini 3
+const ai = new GoogleGenAI({ apiKey: API_KEY });
+
 export const analyzeNoticeText = async (extractedText) => {
-  const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-  if (!apiKey) throw new Error("Clé API absente.");
-
-  // On utilise l'alias 'latest' qui pointe vers le modèle actif de ton compte
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`;
-
-  const payload = {
-    contents: [{
-      parts: [{
-        text: "Tu es un assistant technique. Analyse ce texte et réponds UNIQUEMENT par un objet JSON respectant ce format : {\"marque\": \"\", \"reference\": \"\", \"type\": \"\", \"pannes\": [{\"code\": \"\", \"label\": \"\", \"solution\": \"\"}]}. Voici le texte : " + extractedText.substring(0, 10000)
-      }]
-    }]
-    // On a supprimé generationConfig pour éviter toute erreur de champ inconnu
-  };
+  if (!API_KEY) {
+    throw new Error("Clé API manquante dans Vercel (VITE_GEMINI_API_KEY)");
+  }
 
   try {
-    const response = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
+    const response = await ai.models.generateContent({
+      // Utilisation du modèle spécifique 2026
+      model: "gemini-3-flash-preview", 
+      contents: `Tu es un expert en maintenance. Analyse ce texte de notice technique et renvoie UNIQUEMENT un JSON pur.
+      Format attendu :
+      {
+        "marque": "...",
+        "reference": "...",
+        "type": "...",
+        "pannes": [{"code": "...", "label": "...", "solution": "..."}]
+      }
+      
+      Texte à analyser : ${extractedText.substring(0, 20000)}`,
+      config: {
+        // Activation du nouveau moteur de réflexion de Gemini 3
+        thinkingLevel: "medium", 
+        temperature: 0.2,
+      }
     });
 
-    const data = await response.json();
+    // Dans le nouveau SDK, la réponse se récupère ainsi
+    const resultText = response.text;
 
-    if (!response.ok) {
-      throw new Error(data.error?.message || "Erreur API");
-    }
-
-    let resultText = data.candidates[0].content.parts[0].text;
+    // Nettoyage pour ne garder que le JSON
+    const cleanJson = resultText.replace(/```json/g, "").replace(/```/g, "").trim();
     
-    // Nettoyage manuel du JSON au cas où Gemini ajoute des balises ```json
-    resultText = resultText.replace(/```json/g, "").replace(/```/g, "").trim();
-    
-    return JSON.parse(resultText);
+    return JSON.parse(cleanJson);
 
   } catch (error) {
-    throw new Error(`Erreur : ${error.message}`);
+    console.error("Erreur lors de l'appel à Gemini 3 :", error);
+    throw new Error(`Erreur Gemini 3 : ${error.message}`);
   }
 };
