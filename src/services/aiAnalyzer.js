@@ -2,6 +2,11 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 
 // On récupère la clé depuis les variables d'environnement de Vite
 const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+if (!apiKey) {
+    console.log("DEBUG: La variable VITE_GEMINI_API_KEY est vide ou indéfinie.");
+} else {
+    console.log("DEBUG: La clé commence par :", apiKey.substring(0, 5));
+}
 const genAI = new GoogleGenerativeAI(apiKey);
 
 export const analyzeNoticeText = async (extractedText) => {
