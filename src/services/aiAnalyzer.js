@@ -1,46 +1,46 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
-
-const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-const genAI = new GoogleGenerativeAI(apiKey);
-
 export const analyzeNoticeText = async (extractedText) => {
+  const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+
   if (!apiKey) {
-    throw new Error("La clé API (VITE_GEMINI_API_KEY) n'est pas configurée dans Vercel.");
+    throw new Error("Clé API manquante dans Vercel (VITE_GEMINI_API_KEY)");
   }
 
-  // Utilisation de gemini-1.5-flash (le plus rapide et compatible)
-  // Remplace la ligne existante par celle-ci :
-const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
+  // URL de l'API en direct (sans passer par le SDK qui bug)
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
 
-  const prompt = `
-    Tu es un expert en motorisation de portail. Analyse ce texte de notice technique.
-    Extraits les informations suivantes au format JSON pur uniquement :
-    {
-      "marque": "NOM DE LA MARQUE",
-      "reference": "MODELE EXACT",
-      "type": "Coulissant ou Battant ou Garage",
-      "pannes": [
-        {"code": "CODE", "label": "SIGNIFICATION", "solution": "REPARATION"}
-      ]
+  const payload = {
+    contents: [{
+      parts: [{
+        text: `Tu es un expert en maintenance. Analyse ce texte et renvoie UNIQUEMENT un JSON pur. 
+        Format : {"marque": "...", "reference": "...", "type": "...", "pannes": [{"code": "...", "label": "...", "solution": "..."}]}
+        Texte : ${extractedText.substring(0, 15000)}`
+      }]
+    }],
+    generationConfig: {
+      temperature: 0.1,
+      responseMimeType: "application/json"
     }
-    Texte de la notice : ${extractedText.substring(0, 15000)}
-  `;
+  };
 
   try {
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    let text = response.text();
-    
-    // Nettoyage pour ne garder que le JSON
-    const startJson = text.indexOf('{');
-    const endJson = text.lastIndexOf('}');
-    if (startJson !== -1 && endJson !== -1) {
-      text = text.substring(startJson, endJson + 1);
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(`Google API ${response.status}: ${errorData.error?.message || 'Erreur inconnue'}`);
     }
 
-    return JSON.parse(text);
+    const data = await response.json();
+    const resultText = data.candidates[0].content.parts[0].text;
+    
+    return JSON.parse(resultText);
+
   } catch (error) {
-    // On propage l'erreur réelle pour qu'elle soit affichée dans le Log de l'interface
-    throw new Error(`Google AI Error: ${error.message}`);
+    console.error("Erreur radicale :", error);
+    throw new Error(`Échec final : ${error.message}`);
   }
 };
