@@ -1,8 +1,16 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-const genAI = new GoogleGenerativeAI("TA_CLE_ICI");
+// On récupère la clé depuis les variables d'environnement de Vite
+const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+const genAI = new GoogleGenerativeAI(apiKey);
 
 export const analyzeNoticeText = async (extractedText) => {
+  // Sécurité si la clé est manquante
+  if (!apiKey) {
+    console.error("Clé API manquante ! Configurez VITE_GEMINI_API_KEY");
+    return { marque: "Erreur", reference: "Clé API non configurée", pannes: [] };
+  }
+
   const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
   const prompt = `
@@ -17,7 +25,7 @@ export const analyzeNoticeText = async (extractedText) => {
       ]
     }
     Si tu ne trouves pas une info, mets "Inconnu".
-    Texte de la notice : ${extractedText}
+    Texte de la notice : ${extractedText.substring(0, 20000)}
   `;
 
   try {
@@ -25,17 +33,21 @@ export const analyzeNoticeText = async (extractedText) => {
     const response = await result.response;
     let text = response.text();
     
-    // Nettoyage ultra-robuste du Markdown que Gemini ajoute parfois
-    text = text.replace(/```json/g, "")
-               .replace(/```/g, "")
-               .trim();
-
-    console.log("Texte nettoyé envoyé au parseur :", text); // Pour vérifier dans la console
+    // Nettoyage du JSON (au cas où Gemini ajoute du Markdown)
+    const startJson = text.indexOf('{');
+    const endJson = text.lastIndexOf('}');
     
+    if (startJson !== -1 && endJson !== -1) {
+      text = text.substring(startJson, endJson + 1);
+    }
+
     return JSON.parse(text);
   } catch (error) {
-    console.error("Erreur IA (Analyse ou Parsing):", error);
-    // On retourne un objet vide structuré pour éviter de faire planter le composant
-    return { marque: "Erreur", reference: "Analyse échouée", pannes: [] };
+    console.error("Erreur IA:", error);
+    return { 
+      marque: "Erreur", 
+      reference: "Analyse impossible", 
+      pannes: [] 
+    };
   }
 };
