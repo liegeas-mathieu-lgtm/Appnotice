@@ -1,6 +1,6 @@
 import * as pdfjs from 'pdfjs-dist';
 
-// Configuration du worker pour traiter le PDF (nécessaire pour pdfjs)
+// Configuration du worker
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
 export const extractTextFromPDF = async (file) => {
@@ -11,9 +11,7 @@ export const extractTextFromPDF = async (file) => {
   for (let i = 1; i <= pdf.numPages; i++) {
     const page = await pdf.getPage(i);
     const textContent = await page.getTextContent();
-    const pageText = textContent.items.map(item => item.str).join(" ");
-    fullText += pageText + "\n";
+    fullText += textContent.items.map(item => item.str).join(" ") + "\n";
   }
-
   return fullText;
 };

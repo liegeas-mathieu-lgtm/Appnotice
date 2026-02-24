@@ -3,6 +3,7 @@ import { UploadCloud, FileText, CheckCircle2, AlertCircle, Loader2 } from 'lucid
 import { extractTextFromPDF } from '../services/pdfService';
 import { analyzeNoticeText } from '../services/aiAnalyzer';
 import { supabase } from '../supabaseClient'; // Vérifie que ton client est bien ici
+import { extractTextFromPDF } from '../services/pdfService';
 
 export const NoticeImporter = ({ onImportSuccess }) => {
   const [loading, setLoading] = useState(false);
