@@ -1,128 +1,123 @@
 import React, { useState } from 'react';
-import * as pdfjsLib from 'pdfjs-dist';
+import { UploadCloud, FileText, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
+import { extractTextFromPDF } from '../services/pdfService';
 import { analyzeNoticeText } from '../services/aiAnalyzer';
-import { Loader2, FileText, CheckCircle, AlertTriangle } from 'lucide-react';
-
-// Configuration du Worker via CDN stable (Legacy pour compatibilité mobile)
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/legacy/build/pdf.worker.min.mjs`;
+import { supabase } from '../supabaseClient'; // Vérifie que ton client est bien ici
 
 export const NoticeImporter = ({ onImportSuccess }) => {
-  const [status, setStatus] = useState('idle'); 
-  const [debugLog, setDebugLog] = useState(''); 
-  const [extractedData, setExtractedData] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [logs, setLogs] = useState([]);
+  const [error, setError] = useState(null);
 
-  const addLog = (msg) => {
-    setDebugLog(prev => prev + "\n> " + msg);
+  const addLog = (message) => {
+    setLogs(prev => [...prev, { time: new Date().toLocaleTimeString(), msg: message }]);
   };
 
-  const processNotice = async (file) => {
-    if (!file) return;
-    
-    setDebugLog("--- Nouvelle Analyse ---");
-    setStatus('extracting');
-    addLog(`Fichier reçu : ${file.name}`);
+  const handleFileChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file || file.type !== 'application/pdf') {
+      setError("Veuillez sélectionner un fichier PDF valide.");
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    setLogs([]);
+    addLog("Fichier reçu : " + file.name);
 
     try {
-      const arrayBuffer = await file.arrayBuffer();
-      addLog("Chargement du moteur PDF...");
+      // ÉTAPE 1 : Upload vers Supabase Storage
+      addLog("Sauvegarde dans le bucket 'notices'...");
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
       
-      const loadingTask = pdfjsLib.getDocument({ 
-        data: arrayBuffer,
-        disableFontFace: true 
-      });
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('notices')
+        .upload(fileName, file);
+
+      if (uploadError) throw new Error("Erreur Storage : " + uploadError.message);
+      addLog("Fichier sauvegardé avec succès.");
+
+      // ÉTAPE 2 : Extraction du texte
+      addLog("Extraction du texte technique...");
+      const text = await extractTextFromPDF(file);
+      if (!text || text.length < 100) throw new Error("Le PDF semble vide ou illisible.");
+      addLog(`Texte extrait (${text.length} caractères).`);
+
+      // ÉTAPE 3 : Analyse IA Gemini 3 Flash
+      addLog("Analyse intelligente par Gemini 3 Flash...");
+      const result = await analyzeNoticeText(text);
       
-      const pdf = await loadingTask.promise;
-      addLog(`PDF chargé : ${pdf.numPages} pages.`);
+      addLog("Analyse terminée !");
       
-      let fullText = "";
-      const maxPages = Math.min(pdf.numPages, 6);
-
-      for (let i = 1; i <= maxPages; i++) {
-        addLog(`Lecture page ${i}...`);
-        const page = await pdf.getPage(i);
-        const content = await page.getTextContent();
-        fullText += content.items.map(item => item.str).join(" ") + " ";
-      }
-
-      if (fullText.trim().length < 50) {
-        throw new Error("Le PDF semble vide ou est une image scannée.");
-      }
-
-      addLog("Envoi à l'IA Gemini...");
-      setStatus('analyzing');
-
-      const result = await analyzeNoticeText(fullText);
-      
-      setExtractedData(result);
-      setStatus('success');
-      addLog("Analyse terminée avec succès !");
+      // On attend 1.5s pour que l'utilisateur voit le succès avant de basculer
+      setTimeout(() => {
+        onImportSuccess(result);
+      }, 1500);
 
     } catch (err) {
       console.error(err);
-      addLog(`ERREUR CRITIQUE : ${err.message}`);
-      setStatus('idle');
+      setError(err.message);
+      addLog("ERREUR : " + err.message);
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div className="space-y-4">
-      <div className="bg-white p-6 rounded-3xl shadow-xl border border-gray-100 text-center">
-        {status === 'idle' && (
-          <label className="cursor-pointer block">
-            <div className="bg-blue-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-              <FileText className="text-blue-600" />
-            </div>
-            <span className="font-bold text-gray-800">Importer une notice PDF</span>
-            <input 
-              type="file" 
-              className="hidden" 
-              accept="*" 
-              onChange={(e) => processNotice(e.target.files[0])} 
-            />
-          </label>
-        )}
-
-        {(status === 'extracting' || status === 'analyzing') && (
-          <div className="py-8">
-            <Loader2 className="animate-spin text-blue-600 mx-auto mb-4" size={40} />
-            <p className="font-bold text-gray-700 animate-pulse">
-              {status === 'extracting' ? 'Lecture du document...' : 'Analyse IA en cours...'}
-            </p>
-          </div>
-        )}
-
-        {status === 'success' && extractedData && (
-          <div className="text-left space-y-4">
-            <div className="flex items-center gap-2 text-green-600 font-bold">
-              <CheckCircle size={24} /> Notice décryptée
-            </div>
-            <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100">
-              <p className="text-sm"><strong>Marque :</strong> {extractedData.marque}</p>
-              <p className="text-sm"><strong>Modèle :</strong> {extractedData.reference}</p>
-              <p className="text-blue-600 font-bold mt-2">{extractedData.pannes?.length || 0} pannes trouvées</p>
-            </div>
-            <button 
-              onClick={() => onImportSuccess(extractedData)}
-              className="w-full bg-blue-600 text-white py-4 rounded-2xl font-bold"
-            >
-              Ajouter au Catalogue
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* ZONE DE DEBUG LOGS */}
-      <div className="mt-4">
-        <p className="text-[10px] font-bold text-gray-400 uppercase ml-2 mb-1 flex items-center gap-1">
-          <AlertTriangle size={10} /> Journal Système (Debug)
-        </p>
-        <div className="bg-black text-green-400 p-4 rounded-2xl text-[11px] font-mono h-48 overflow-y-auto shadow-inner border border-gray-800">
-          {debugLog.split('\n').map((line, i) => (
-            <div key={i} className="mb-1">{line}</div>
-          ))}
-          {status === 'analyzing' && <div className="animate-pulse">_</div>}
+    <div className="bg-white rounded-3xl shadow-xl p-6 border border-gray-100">
+      <div className="text-center mb-8">
+        <div className="bg-blue-50 w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4">
+          <UploadCloud className="text-blue-600" size={32} />
         </div>
+        <h2 className="text-xl font-bold text-gray-800">Importer une notice</h2>
+        <p className="text-gray-500 text-sm mt-1">L'IA Gemini 3 va apprendre les pannes de ce PDF</p>
       </div>
+
+      {/* Zone d'upload */}
+      {!loading && (
+        <label className="relative flex flex-col items-center justify-center w-full h-40 border-2 border-dashed border-gray-200 rounded-2xl cursor-pointer hover:bg-gray-50 hover:border-blue-400 transition-all group">
+          <div className="flex flex-col items-center justify-center pt-5 pb-6">
+            <FileText className="text-gray-400 group-hover:text-blue-500 mb-2" size={32} />
+            <p className="text-sm text-gray-500 font-medium">Cliquer pour choisir le PDF</p>
+          </div>
+          <input type="file" className="hidden" accept=".pdf" onChange={handleFileChange} />
+        </label>
+      )}
+
+      {/* Logs et Progression */}
+      {(loading || logs.length > 0) && (
+        <div className="mt-6 space-y-3">
+          <div className="bg-gray-900 rounded-xl p-4 font-mono text-[10px] sm:text-xs text-green-400 h-40 overflow-y-auto shadow-inner">
+            {logs.map((log, i) => (
+              <div key={i} className="mb-1 flex gap-2">
+                <span className="text-gray-500">[{log.time}]</span>
+                <span>{log.msg}</span>
+              </div>
+            ))}
+            {loading && <div className="animate-pulse flex items-center gap-2 mt-2">
+              <Loader2 className="animate-spin" size={12} />
+              Traitement en cours...
+            </div>}
+          </div>
+        </div>
+      )}
+
+      {/* Erreur */}
+      {error && (
+        <div className="mt-4 p-4 bg-red-50 border border-red-100 rounded-xl flex items-start gap-3 text-red-700 text-sm">
+          <AlertCircle className="shrink-0" size={20} />
+          <p>{error}</p>
+        </div>
+      )}
+
+      {/* Succès final */}
+      {!loading && logs.some(l => l.msg.includes("terminée")) && (
+        <div className="mt-4 p-4 bg-green-50 border border-green-100 rounded-xl flex items-center gap-3 text-green-700 font-bold animate-bounce">
+          <CheckCircle2 size={24} />
+          Chargement du diagnostic...
+        </div>
+      )}
     </div>
   );
 };
