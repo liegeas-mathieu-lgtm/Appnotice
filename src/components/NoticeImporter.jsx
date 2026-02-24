@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { UploadCloud, FileText, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
 import { extractTextFromPDF } from '../services/pdfService';
 import { analyzeNoticeText } from '../services/aiAnalyzer';
-import { supabase } from './supabaseClient'; // Vérifie que ton client est bien ici
+import { supabase } from './supabaseclient'; // Vérifie que ton client est bien ici
 
 export const NoticeImporter = ({ onImportSuccess }) => {
   const [loading, setLoading] = useState(false);
