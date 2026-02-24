@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { UploadCloud, FileText, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
 import { extractTextFromPDF } from '../services/pdfService';
 import { analyzeNoticeText } from '../services/aiAnalyzer';
-import { supabase } from './supabaseclient'; // Vérifie que ton client est bien ici
+import { supabase } from './supabaseclient'; 
 
 export const NoticeImporter = ({ onImportSuccess }) => {
   const [loading, setLoading] = useState(false);
@@ -26,7 +26,7 @@ export const NoticeImporter = ({ onImportSuccess }) => {
     addLog("Fichier reçu : " + file.name);
 
     try {
-      // ÉTAPE 1 : Upload vers Supabase Storage
+      // --- ÉTAPE 1 : UPLOAD STORAGE ---
       addLog("Sauvegarde dans le bucket 'notices'...");
       const fileExt = file.name.split('.').pop();
       const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
@@ -36,21 +36,85 @@ export const NoticeImporter = ({ onImportSuccess }) => {
         .upload(fileName, file);
 
       if (uploadError) throw new Error("Erreur Storage : " + uploadError.message);
+      
+      const { data: { publicUrl } } = supabase.storage
+        .from('notices')
+        .getPublicUrl(fileName);
+        
       addLog("Fichier sauvegardé avec succès.");
 
-      // ÉTAPE 2 : Extraction du texte
+      // --- ÉTAPE 2 : EXTRACTION TEXTE ---
       addLog("Extraction du texte technique...");
       const text = await extractTextFromPDF(file);
       if (!text || text.length < 100) throw new Error("Le PDF semble vide ou illisible.");
       addLog(`Texte extrait (${text.length} caractères).`);
 
-      // ÉTAPE 3 : Analyse IA Gemini 3 Flash
+      // --- ÉTAPE 3 : ANALYSE IA ---
       addLog("Analyse intelligente par Gemini 3 Flash...");
       const result = await analyzeNoticeText(text);
+      addLog("Analyse IA terminée.");
+
+      // --- ÉTAPE 4 : SAUVEGARDE RELATIONNELLE ---
+      addLog("Enregistrement dans la base de données...");
+
+      // 1. Gérer la Marque (brands)
+      let brandId;
+      const { data: brandData, error: brandError } = await supabase
+        .from('brands')
+        .select('id')
+        .ilike('name', result.brand || 'Inconnue') // ilike pour éviter les soucis de casse
+        .maybeSingle();
+
+      if (brandData) {
+        brandId = brandData.id;
+      } else {
+        const { data: newBrand, error: insBrandErr } = await supabase
+          .from('brands')
+          .insert([{ name: result.brand || 'Inconnue' }])
+          .select()
+          .single();
+        if (insBrandErr) throw insBrandErr;
+        brandId = newBrand.id;
+      }
+
+      // 2. Créer le Produit (products)
+      // On utilise model_name et manual_url selon ton SQL
+      const { data: productData, error: prodError } = await supabase
+        .from('products')
+        .insert([
+          {
+            brand_id: brandId,
+            model_name: result.model || result.name || file.name,
+            category: result.category || "Automatisme",
+            manual_url: publicUrl
+          }
+        ])
+        .select()
+        .single();
+
+      if (prodError) throw prodError;
+      const productId = productData.id;
+
+      // 3. Insérer les Codes Erreurs (error_codes)
+      const errorCodes = result.error_codes || result.errors || [];
+      if (errorCodes.length > 0) {
+        const codesToInsert = errorCodes.map(err => ({
+          product_id: productId,
+          code: err.code || "N/A",
+          description: err.description || err.signification || "",
+          solution_pro: err.solution_pro || err.solution || "",
+          solution_particulier: err.solution_particulier || ""
+        }));
+
+        const { error: errCodesErr } = await supabase
+          .from('error_codes')
+          .insert(codesToInsert);
+
+        if (errCodesErr) throw errCodesErr;
+      }
+
+      addLog("Tout est enregistré avec succès !");
       
-      addLog("Analyse terminée !");
-      
-      // On attend 1.5s pour que l'utilisateur voit le succès avant de basculer
       setTimeout(() => {
         onImportSuccess(result);
       }, 1500);
@@ -74,7 +138,6 @@ export const NoticeImporter = ({ onImportSuccess }) => {
         <p className="text-gray-500 text-sm mt-1">L'IA Gemini 3 va apprendre les pannes de ce PDF</p>
       </div>
 
-      {/* Zone d'upload */}
       {!loading && (
         <label className="relative flex flex-col items-center justify-center w-full h-40 border-2 border-dashed border-gray-200 rounded-2xl cursor-pointer hover:bg-gray-50 hover:border-blue-400 transition-all group">
           <div className="flex flex-col items-center justify-center pt-5 pb-6">
@@ -85,7 +148,6 @@ export const NoticeImporter = ({ onImportSuccess }) => {
         </label>
       )}
 
-      {/* Logs et Progression */}
       {(loading || logs.length > 0) && (
         <div className="mt-6 space-y-3">
           <div className="bg-gray-900 rounded-xl p-4 font-mono text-[10px] sm:text-xs text-green-400 h-40 overflow-y-auto shadow-inner">
@@ -95,15 +157,16 @@ export const NoticeImporter = ({ onImportSuccess }) => {
                 <span>{log.msg}</span>
               </div>
             ))}
-            {loading && <div className="animate-pulse flex items-center gap-2 mt-2">
-              <Loader2 className="animate-spin" size={12} />
-              Traitement en cours...
-            </div>}
+            {loading && (
+              <div className="animate-pulse flex items-center gap-2 mt-2">
+                <Loader2 className="animate-spin" size={12} />
+                Traitement en cours...
+              </div>
+            )}
           </div>
         </div>
       )}
 
-      {/* Erreur */}
       {error && (
         <div className="mt-4 p-4 bg-red-50 border border-red-100 rounded-xl flex items-start gap-3 text-red-700 text-sm">
           <AlertCircle className="shrink-0" size={20} />
@@ -111,11 +174,10 @@ export const NoticeImporter = ({ onImportSuccess }) => {
         </div>
       )}
 
-      {/* Succès final */}
-      {!loading && logs.some(l => l.msg.includes("terminée")) && (
+      {!loading && logs.some(l => l.msg.includes("succès !")) && (
         <div className="mt-4 p-4 bg-green-50 border border-green-100 rounded-xl flex items-center gap-3 text-green-700 font-bold animate-bounce">
           <CheckCircle2 size={24} />
-          Chargement du diagnostic...
+          Diagnostic prêt et enregistré !
         </div>
       )}
     </div>
