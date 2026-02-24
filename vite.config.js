@@ -3,12 +3,15 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [react()],
+  define: {
+    // Certains SDK ont besoin que 'global' soit défini en prod
+    'global': {},
+  },
   build: {
-    // Gemini 3 nécessite un moteur JS moderne pour les fonctions de hashage
-    target: 'esnext' 
+    target: 'es2022', // Cible plus précise que esnext pour la stabilité
+    minify: 'esbuild',
   },
   optimizeDeps: {
-    // Force l'inclusion du SDK pour éviter les erreurs de modules
     include: ['@google/genai']
   }
 })
