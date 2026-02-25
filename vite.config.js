@@ -4,11 +4,13 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   build: {
-    target: 'es2020', // On descend d'un cran pour plus de compatibilité mobile
-    minify: 'terser', // Terser est plus lent mais plus sûr pour les mobiles que esbuild
-    terserOptions: {
-      compress: {
-        unused: false, // Empêche de supprimer des fonctions de hachage "apparemment" inutilisées
+    // es2020 est le meilleur compromis pour la compatibilité mobile (iOS/Android)
+    target: 'es2020', 
+    minify: 'esbuild',
+    // On empêche esbuild de transformer les gros entiers (BigInt) qui causent souvent l'erreur toHex
+    esbuild: {
+      supported: {
+        'bigint': true
       }
     }
   },
