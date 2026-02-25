@@ -7,23 +7,24 @@ export const analyzeNoticeText = async (extractedText) => {
   if (!API_KEY) throw new Error("Clé API manquante");
 
   try {
-    // Appel du modèle Gemini 2.0 Flash (la version ultra-rapide de nouvelle génération)
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    // Utilisation du nom exact selon la mise à jour du 21 janvier 2026
+    const model = genAI.getGenerativeModel({ model: "gemini-3-flash-preview" });
 
     const prompt = `Tu es un expert en maintenance. Analyse ce texte et renvoie un JSON pur.
     Format : {"brand": "...", "model": "...", "category": "...", "error_codes": [{"code": "...", "description": "...", "solution_particulier": "...", "solution_pro": "..."}]}
     
-    Texte : ${extractedText.substring(0, 20000)}`;
+    Texte : ${extractedText.substring(0, 25000)}`;
 
     const result = await model.generateContent(prompt);
     const response = await result.response;
     
-    // Nettoyage et parsing
+    // Nettoyage Markdown
     const text = response.text().replace(/```json/g, "").replace(/```/g, "").trim();
     return JSON.parse(text);
 
   } catch (error) {
-    console.error("Détail Erreur Gemini:", error);
-    throw new Error(`Erreur avec Gemini 2.0 : ${error.message}`);
+    console.error("Détail Erreur Gemini 3:", error);
+    // On affiche l'erreur spécifique pour savoir si c'est encore un problème de nom
+    throw new Error(`Erreur Gemini 3 : ${error.message}`);
   }
 };
