@@ -4,17 +4,10 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   build: {
-    target: 'es2022', // Très important pour supporter les fonctions Crypto modernes
-    commonjsOptions: {
-      transformMixedEsModules: true,
-    }
+    target: 'es2022' // Supporte les fonctions modernes nécessaires à Gemini
   },
   optimizeDeps: {
-    // On force Vite à pré-vendre le SDK Gemini pour qu'il ne soit pas altéré
+    // Supprime @google/genai d'ici s'il y était
     include: ['@google/generative-ai']
-  },
-  // On s'assure que global n'est pas redéfini bizarrement
-  define: {
-    'process.env': {}
   }
 })
