@@ -1,43 +1,38 @@
-// On utilise UNIQUEMENT le SDK officiel stable
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 const genAI = new GoogleGenerativeAI(API_KEY);
 
 export const analyzeNoticeText = async (extractedText) => {
-  if (!API_KEY) throw new Error("Clé API manquante");
+  if (!API_KEY) throw new Error("Clé API manquante dans les variables d'environnement");
 
   try {
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-    const prompt = `
-      Tu es un expert en dépannage d'automatismes. 
-      Analyse cette notice technique et extrait les informations au format JSON.
-
-      FORMAT :
-      {
-        "brand": "Marque",
-        "model": "Modèle",
-        "category": "Type (Portail, Garage, etc.)",
-        "error_codes": [
-          {
-            "code": "Code",
-            "description": "Signification",
-            "solution_particulier": "Action client",
-            "solution_pro": "Action technicien"
-          }
-        ]
-      }
-
-      Texte : ${extractedText.substring(0, 25000)}`;
+    const prompt = `Tu es un expert en dépannage d'automatismes. 
+    Analyse cette notice et extrait les pannes au format JSON pur.
+    
+    Format : {"brand": "...", "model": "...", "category": "...", "error_codes": [{"code": "...", "description": "...", "solution_particulier": "...", "solution_pro": "..."}]}
+    
+    Texte : ${extractedText.substring(0, 20000)}`;
 
     const result = await model.generateContent(prompt);
     const response = await result.response;
-    const text = response.text().replace(/```json/g, "").replace(/```/g, "").trim();
+    const text = response.text();
+
+    // On nettoie les balises markdown
+    const cleanJson = text.replace(/```json/g, "").replace(/```/g, "").trim();
     
-    return JSON.parse(text);
+    try {
+      return JSON.parse(cleanJson);
+    } catch (e) {
+      console.error("Texte reçu de Gemini (non-JSON):", text);
+      throw new Error("L'IA n'a pas renvoyé un format JSON valide.");
+    }
+
   } catch (error) {
-    console.error("Erreur Gemini:", error);
-    throw new Error("L'IA n'a pas pu analyser le document.");
+    // ICI : On renvoie l'erreur réelle de Google pour la voir dans tes logs
+    console.error("Détail Erreur Gemini:", error);
+    throw new Error(`Erreur Gemini : ${error.message}`);
   }
 };
