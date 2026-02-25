@@ -1,10 +1,7 @@
 import * as pdfjs from 'pdfjs-dist';
 
-// Cette ligne est magique : elle dit à Vite d'utiliser le worker local
-pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-  'pdfjs-dist/build/pdf.worker.mjs',
-  import.meta.url
-).toString();
+// On utilise un CDN externe pour le worker, c'est beaucoup plus stable sur mobile
+pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.mjs`;
 
 export const extractTextFromPDF = async (file) => {
   try {

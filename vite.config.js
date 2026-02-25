@@ -4,7 +4,7 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   build: {
-    target: 'esnext',
-    minify: true
+    target: 'es2018', // Plus compatible avec Samsung Internet
+    minify: 'esbuild'
   }
 })
