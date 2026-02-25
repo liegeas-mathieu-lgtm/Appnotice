@@ -1,12 +1,17 @@
 import * as pdfjs from 'pdfjs-dist';
 
-// On utilise un CDN externe pour le worker, c'est beaucoup plus stable sur mobile
-pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.mjs`;
+// On utilise la version .js standard plutôt que .mjs pour Samsung Internet
+pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
 
 export const extractTextFromPDF = async (file) => {
   try {
     const arrayBuffer = await file.arrayBuffer();
-    const loadingTask = pdfjs.getDocument(arrayBuffer);
+    // On force l'utilisation de la version standard
+    const loadingTask = pdfjs.getDocument({
+      data: arrayBuffer,
+      useWorkerFetch: true, 
+      isEvalSupported: false
+    });
     
     const pdf = await loadingTask.promise;
     let fullText = "";
