@@ -1,20 +1,20 @@
 import React, { useState } from 'react';
-import { Camera, Search, AlertCircle, X, UploadCloud } from 'lucide-react';
+import { Camera, Search, AlertCircle, X, UploadCloud, MessageSquare } from 'lucide-react';
 import { Scanner } from './components/Scanner';
 import { Diagnostic } from './components/Diagnostic';
 import { AddProductForm } from './components/AddProductForm';
 import { NoticeImporter } from './components/NoticeImporter';
 import { fetchDiagnosticByRef } from './services/diagnostic';
+import { ExpertChat } from './components/ExpertChat';
 
 function App() {
-  const [activeTab, setActiveTab] = useState('scan'); // 'scan' ou 'import'
+  const [activeTab, setActiveTab] = useState('scan'); // 'scan', 'import' ou 'chat'
   const [showScanner, setShowScanner] = useState(false);
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [notFoundRef, setNotFoundRef] = useState(null);
   const [manualSearch, setManualSearch] = useState('');
 
-  // Gère la recherche par scan ou saisie manuelle
   const handleScan = async (text) => {
     if (!text) return;
     setLoading(true);
@@ -37,7 +37,6 @@ function App() {
     }
   };
 
-  // Réinitialise l'interface
   const resetAll = () => {
     setData(null);
     setNotFoundRef(null);
@@ -47,25 +46,28 @@ function App() {
 
   return (
     <div className="min-h-screen bg-gray-50 font-sans flex flex-col">
-      {/* Navbar */}
       <nav className="bg-blue-600 p-4 text-white shadow-md sticky top-0 z-10">
         <h1 className="text-xl font-bold text-center">TechScan Pro</h1>
       </nav>
 
-      {/* Main Content */}
-      <main className="flex-1 p-6 max-w-lg mx-auto w-full pb-24">
+      <main className="flex-1 p-4 max-w-lg mx-auto w-full pb-24">
         {loading && (
-          <div className="fixed inset-0 bg-white/80 backdrop-blur-sm z-50 flex items-center justify-center">
-            <div className="text-blue-600 font-bold flex flex-col items-center text-center px-6">
+          <div className="fixed inset-0 bg-white/80 backdrop-blur-sm z-50 flex items-center justify-center text-center px-6">
+            <div className="text-blue-600 font-bold flex flex-col items-center">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
-              <p className="text-lg">Analyse intelligente en cours...</p>
-              <p className="text-sm text-gray-500 font-normal mt-2">Gemini 3 Flash explore le document et sauvegarde le fichier.</p>
+              <p className="text-lg">Analyse en cours...</p>
             </div>
           </div>
         )}
-
+        
         {/* AFFICHAGE DES ONGLETS */}
-        {activeTab === 'scan' ? (
+        {activeTab === 'chat' && (
+          <div className="animate-in fade-in duration-300">
+            <ExpertChat />
+          </div>
+        )}
+
+        {activeTab === 'scan' && (
           <div className="space-y-6">
             {data ? (
               <Diagnostic data={data} onReset={resetAll} />
@@ -86,7 +88,6 @@ function App() {
               </div>
             ) : (
               <div className="space-y-6">
-                {/* RECHERCHE MANUELLE */}
                 <form 
                   onSubmit={(e) => { e.preventDefault(); handleScan(manualSearch); }}
                   className="relative flex items-center"
@@ -96,7 +97,7 @@ function App() {
                     value={manualSearch}
                     onChange={(e) => setManualSearch(e.target.value)}
                     placeholder="Référence (ex: ZLJ24, SLX...)"
-                    className="w-full p-4 pl-12 bg-white rounded-2xl shadow-sm border border-gray-200 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                    className="w-full p-4 pl-12 bg-white rounded-2xl shadow-sm border border-gray-200 outline-none focus:ring-2 focus:ring-blue-500"
                   />
                   <Search className="absolute left-4 text-gray-400" size={20} />
                   {manualSearch.length > 0 && (
@@ -104,22 +105,14 @@ function App() {
                   )}
                 </form>
 
-                <div className="flex items-center gap-4 text-gray-300">
-                  <div className="h-px bg-gray-200 flex-1"></div>
-                  <span className="text-xs font-bold text-gray-400">OU</span>
-                  <div className="h-px bg-gray-200 flex-1"></div>
-                </div>
-
-                {/* BOUTON CAMERA */}
                 <div className="bg-white p-8 rounded-3xl shadow-xl text-center border border-gray-100">
                   <div className="bg-blue-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
                     <Camera className="text-blue-600" size={40} />
                   </div>
-                  <h2 className="text-2xl font-bold mb-2 text-gray-800">Scanner la plaque</h2>
-                  <p className="text-gray-500 mb-8 text-sm">Identifiez instantanément le matériel et ses codes erreurs.</p>
+                  <h2 className="text-2xl font-bold mb-2">Scanner la plaque</h2>
                   <button 
                     onClick={() => setShowScanner(true)}
-                    className="w-full bg-blue-600 text-white font-bold py-4 rounded-2xl shadow-lg hover:bg-blue-700 active:scale-95 transition-all"
+                    className="w-full bg-blue-600 text-white font-bold py-4 rounded-2xl shadow-lg mt-4"
                   >
                     Ouvrir le scanner
                   </button>
@@ -127,11 +120,11 @@ function App() {
               </div>
             )}
           </div>
-        ) : (
-          /* SECTION IMPORTATION DE NOTICE (V3 - Gemini 2026) */
+        )}
+
+        {activeTab === 'import' && (
           <div className="animate-in slide-in-from-right duration-300">
             <NoticeImporter onImportSuccess={(extractedData) => {
-              // Une fois l'IA et l'upload terminés, on bascule sur l'onglet Diagnostic
               setActiveTab('scan');
               setData(extractedData);
             }} />
@@ -140,35 +133,40 @@ function App() {
       </main>
 
       {/* BARRE DE NAVIGATION BASSE */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex justify-around items-center p-3 z-40 pb-6 shadow-[0_-4px_10px_rgba(0,0,0,0.05)]">
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex justify-around items-center p-3 z-40 pb-6 shadow-lg">
         <button 
           onClick={() => { resetAll(); setActiveTab('scan'); }}
-          className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'scan' ? 'text-blue-600 scale-110' : 'text-gray-400'}`}
+          className={`flex flex-col items-center gap-1 ${activeTab === 'scan' ? 'text-blue-600' : 'text-gray-400'}`}
         >
-          <Camera size={24} strokeWidth={activeTab === 'scan' ? 2.5 : 2} />
-          <span className="text-[10px] font-bold uppercase tracking-wider">Scanner</span>
+          <Camera size={24} />
+          <span className="text-[10px] font-bold">SCANNER</span>
+        </button>
+
+        <button 
+          onClick={() => { setActiveTab('chat'); }}
+          className={`flex flex-col items-center gap-1 ${activeTab === 'chat' ? 'text-blue-600' : 'text-gray-400'}`}
+        >
+          <MessageSquare size={24} />
+          <span className="text-[10px] font-bold">EXPERT IA</span>
         </button>
 
         <button 
           onClick={() => { resetAll(); setActiveTab('import'); }}
-          className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'import' ? 'text-blue-600 scale-110' : 'text-gray-400'}`}
+          className={`flex flex-col items-center gap-1 ${activeTab === 'import' ? 'text-blue-600' : 'text-gray-400'}`}
         >
-          <UploadCloud size={24} strokeWidth={activeTab === 'import' ? 2.5 : 2} />
-          <span className="text-[10px] font-bold uppercase tracking-wider">Notice IA</span>
+          <UploadCloud size={24} />
+          <span className="text-[10px] font-bold">NOTICE IA</span>
         </button>
       </div>
 
-      {/* MODAL SCANNER PLEIN ÉCRAN */}
       {showScanner && (
         <div className="fixed inset-0 z-[60] bg-black flex flex-col">
           <div className="absolute top-6 right-6 z-[70]">
-            <button onClick={() => setShowScanner(false)} className="bg-white/20 backdrop-blur-md text-white p-3 rounded-full">
+            <button onClick={() => setShowScanner(false)} className="bg-white/20 text-white p-3 rounded-full">
               <X size={28} />
             </button>
           </div>
-          <div className="flex-1">
-            <Scanner onScanSuccess={handleScan} />
-          </div>
+          <Scanner onScanSuccess={handleScan} />
         </div>
       )}
     </div>
