@@ -7,20 +7,23 @@ export const analyzeNoticeText = async (extractedText) => {
   if (!API_KEY) throw new Error("Clé API manquante");
 
   try {
-    // Utilisation du nom de modèle complet pour éviter la 404
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
+    // Appel du modèle Gemini 2.0 Flash (la version ultra-rapide de nouvelle génération)
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
-    const prompt = `Extraire les pannes au format JSON pur.
+    const prompt = `Tu es un expert en maintenance. Analyse ce texte et renvoie un JSON pur.
     Format : {"brand": "...", "model": "...", "category": "...", "error_codes": [{"code": "...", "description": "...", "solution_particulier": "...", "solution_pro": "..."}]}
+    
     Texte : ${extractedText.substring(0, 20000)}`;
 
     const result = await model.generateContent(prompt);
     const response = await result.response;
-    const text = response.text().replace(/```json/g, "").replace(/```/g, "").trim();
     
+    // Nettoyage et parsing
+    const text = response.text().replace(/```json/g, "").replace(/```/g, "").trim();
     return JSON.parse(text);
+
   } catch (error) {
     console.error("Détail Erreur Gemini:", error);
-    throw new Error(`Erreur Gemini : ${error.message}`);
+    throw new Error(`Erreur avec Gemini 2.0 : ${error.message}`);
   }
 };
