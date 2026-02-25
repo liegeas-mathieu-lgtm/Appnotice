@@ -5,6 +5,6 @@ export default defineConfig({
   plugins: [react()],
   build: {
     target: 'esnext',
-    minify: false, // C'est l'option clé pour corriger l'erreur de hachage sur mobile
+    minify: true
   }
 })
