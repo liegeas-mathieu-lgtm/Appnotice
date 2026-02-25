@@ -8,6 +8,13 @@
     <script src="https://cdn.tailwindcss.com"></script>
   </head>
   <body>
+    <script>
+  // Correction pour les navigateurs mobiles qui ont du mal avec les fonctions de hachage Gemini
+  if (typeof global === 'undefined') {
+    window.global = window;
+  }
+</script>
+<div id="root"></div>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>

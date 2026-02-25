@@ -4,14 +4,15 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   build: {
-    target: 'es2022',
-    // On ajoute un hash unique aux noms de fichiers pour forcer la mise à jour
-    rollupOptions: {
-      output: {
-        entryFileNames: `assets/[name]-[hash]-${Date.now()}.js`,
-        chunkFileNames: `assets/[name]-[hash]-${Date.now()}.js`,
-        assetFileNames: `assets/[name]-[hash]-${Date.now()}.[ext]`
+    target: 'es2020', // On descend d'un cran pour plus de compatibilité mobile
+    minify: 'terser', // Terser est plus lent mais plus sûr pour les mobiles que esbuild
+    terserOptions: {
+      compress: {
+        unused: false, // Empêche de supprimer des fonctions de hachage "apparemment" inutilisées
       }
     }
+  },
+  optimizeDeps: {
+    include: ['@google/generative-ai']
   }
 })
