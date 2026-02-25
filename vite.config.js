@@ -4,10 +4,14 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   build: {
-    target: 'es2022' // Supporte les fonctions modernes nécessaires à Gemini
-  },
-  optimizeDeps: {
-    // Supprime @google/genai d'ici s'il y était
-    include: ['@google/generative-ai']
+    target: 'es2022',
+    // On ajoute un hash unique aux noms de fichiers pour forcer la mise à jour
+    rollupOptions: {
+      output: {
+        entryFileNames: `assets/[name]-[hash]-${Date.now()}.js`,
+        chunkFileNames: `assets/[name]-[hash]-${Date.now()}.js`,
+        assetFileNames: `assets/[name]-[hash]-${Date.now()}.[ext]`
+      }
+    }
   }
 })
