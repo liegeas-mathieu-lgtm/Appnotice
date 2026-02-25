@@ -1,17 +1,15 @@
 import * as pdfjs from 'pdfjs-dist';
 
-// On utilise la version .js standard plutôt que .mjs pour Samsung Internet
-pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
+// Cette ligne est magique : elle dit à Vite d'utiliser le worker local
+pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+  'pdfjs-dist/build/pdf.worker.mjs',
+  import.meta.url
+).toString();
 
 export const extractTextFromPDF = async (file) => {
   try {
     const arrayBuffer = await file.arrayBuffer();
-    // On force l'utilisation de la version standard
-    const loadingTask = pdfjs.getDocument({
-      data: arrayBuffer,
-      useWorkerFetch: true, 
-      isEvalSupported: false
-    });
+    const loadingTask = pdfjs.getDocument(arrayBuffer);
     
     const pdf = await loadingTask.promise;
     let fullText = "";
