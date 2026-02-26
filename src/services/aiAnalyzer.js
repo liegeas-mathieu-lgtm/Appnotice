@@ -1,4 +1,7 @@
 export const fetchAIResponse = async (userQuery, history) => {
+  // Correction de l'URL pour utiliser un modèle stable
+  const STABLE_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`;
+
   const prompt = `
   Tu es TechScan Expert, un assistant de dépannage en automatismes.
   HISTORIQUE : ${JSON.stringify(history.slice(-5))}
@@ -15,7 +18,7 @@ export const fetchAIResponse = async (userQuery, history) => {
   }`;
 
   try {
-    const response = await fetch(API_URL, {
+    const response = await fetch(STABLE_API_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
@@ -23,20 +26,32 @@ export const fetchAIResponse = async (userQuery, history) => {
 
     const data = await response.json();
 
-    // --- LE CORRECTIF ICI ---
-    if (!data.candidates || data.candidates.length === 0) {
-      console.error("Réponse Gemini vide ou bloquée:", data);
+    // --- LOGS CRITIQUES POUR LE DEBUG ---
+    if (data.error) {
+      console.error("❌ ERREUR API GOOGLE :", data.error.message);
       return { 
-        text: "Je réfléchis un peu trop... Pouvez-vous reformuler votre question ou donner la marque ?", 
+        text: `Erreur technique Google : ${data.error.message}`, 
         detectedReference: null 
       };
     }
 
+    if (!data.candidates || !data.candidates[0] || !data.candidates[0].content) {
+      console.error("⚠️ RÉPONSE INCOMPLÈTE :", data);
+      return { 
+        text: "L'IA n'a pas pu générer de réponse. Réessayez avec une référence précise.", 
+        detectedReference: null 
+      };
+    }
+
+    // Extraction sécurisée
     const rawText = data.candidates[0].content.parts[0].text;
     return JSON.parse(cleanGeminiResponse(rawText));
     
   } catch (err) {
-    console.error("Erreur fetchAIResponse:", err);
-    return { text: "Désolé, ma connexion avec le cerveau IA a été coupée. Quelle est la marque de votre moteur ?", detectedReference: null };
+    console.error("🔥 CRASH TOTAL fetchAIResponse:", err);
+    return { 
+      text: "Désolé, connexion perdue. Vérifiez votre clé API dans Vercel.", 
+      detectedReference: null 
+    };
   }
 };
