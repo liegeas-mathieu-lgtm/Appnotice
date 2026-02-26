@@ -1,24 +1,17 @@
+const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+// UTILISE CE MODÈLE PRÉCIS (Le plus compatible)
+const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`;
+
+const cleanGeminiResponse = (text) => {
+  return text.replace(/```json/g, "").replace(/```/g, "").trim();
+};
+
 export const fetchAIResponse = async (userQuery, history) => {
-  // Correction de l'URL pour utiliser un modèle stable
-  const STABLE_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`;
-
-  const prompt = `
-  Tu es TechScan Expert, un assistant de dépannage en automatismes.
-  HISTORIQUE : ${JSON.stringify(history.slice(-5))}
-  MESSAGE : "${userQuery}"
-
-  TACHE : 
-  1. Si l'utilisateur mentionne une référence technique (ex: BX74, 455D, Robus), extrais-la dans "detectedReference". Sinon null.
-  2. Si le message est vague, pose une question pour la marque ou le symptôme.
-
-  RENVOIE UNIQUEMENT UN JSON PUR :
-  {
-    "text": "Ta réponse ici",
-    "detectedReference": "REF_OU_NULL"
-  }`;
+  const prompt = `Tu es TechScan Expert. Analyse : "${userQuery}". 
+  Réponds UNIQUEMENT en JSON : {"text": "ta réponse", "detectedReference": "la_ref_ou_null"}`;
 
   try {
-    const response = await fetch(STABLE_API_URL, {
+    const response = await fetch(API_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
@@ -26,32 +19,23 @@ export const fetchAIResponse = async (userQuery, history) => {
 
     const data = await response.json();
 
-    // --- LOGS CRITIQUES POUR LE DEBUG ---
+    // LOG DE SÉCURITÉ : Affiche l'erreur réelle de Google dans ta console
     if (data.error) {
       console.error("❌ ERREUR API GOOGLE :", data.error.message);
-      return { 
-        text: `Erreur technique Google : ${data.error.message}`, 
-        detectedReference: null 
-      };
+      return { text: "Erreur de configuration API : " + data.error.message, detectedReference: null };
     }
 
+    // VÉRIFICATION DES CANDIDATS
     if (!data.candidates || !data.candidates[0] || !data.candidates[0].content) {
       console.error("⚠️ RÉPONSE INCOMPLÈTE :", data);
-      return { 
-        text: "L'IA n'a pas pu générer de réponse. Réessayez avec une référence précise.", 
-        detectedReference: null 
-      };
+      return { text: "L'IA n'est pas disponible pour le moment.", detectedReference: null };
     }
 
-    // Extraction sécurisée
     const rawText = data.candidates[0].content.parts[0].text;
     return JSON.parse(cleanGeminiResponse(rawText));
-    
+
   } catch (err) {
-    console.error("🔥 CRASH TOTAL fetchAIResponse:", err);
-    return { 
-      text: "Désolé, connexion perdue. Vérifiez votre clé API dans Vercel.", 
-      detectedReference: null 
-    };
+    console.error("🔥 ERREUR CRITIQUE :", err);
+    return { text: "Désolé, une erreur est survenue.", detectedReference: null };
   }
 };
