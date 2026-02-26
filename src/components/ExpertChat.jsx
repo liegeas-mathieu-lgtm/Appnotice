@@ -4,6 +4,7 @@ import { findNoticePDF } from '../services/searchService';
 import { extractTextFromPDF } from '../services/pdfService';
 import { analyzeNoticeText, fetchAIResponse, fetchFinalDiagnosis } from '../services/aiAnalyzer';
 import { fetchDiagnosticByRef } from '../services/diagnostic';
+import { supabase } from '../api/supabase'; // Import pour la sauvegarde
 
 export const ExpertChat = () => {
   const [messages, setMessages] = useState([
@@ -13,7 +14,6 @@ export const ExpertChat = () => {
   const [loading, setLoading] = useState(false);
   const scrollRef = useRef(null);
 
-  // Auto-scroll vers le bas
   useEffect(() => {
     scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
@@ -34,41 +34,68 @@ export const ExpertChat = () => {
     try {
       // 1. Analyse de l'intention par Gemini
       const aiResponse = await fetchAIResponse(userQuery, messages);
-      
+      console.log("Analyse Gemini :", aiResponse); // Debug détection
+
       if (aiResponse.detectedReference) {
-        addMessage('bot', `Je détecte le modèle ${aiResponse.detectedReference}. Je vérifie ma base de données...`);
+        const ref = aiResponse.detectedReference;
+        addMessage('bot', `Je détecte le modèle ${ref}. Je vérifie ma base de données...`);
         
-        let data = await fetchDiagnosticByRef(aiResponse.detectedReference);
+        let data = await fetchDiagnosticByRef(ref);
         
-        // 2. Si inconnu, on lance la recherche Google
+        // 2. Si inconnu dans Supabase, on lance la recherche Google
         if (!data) {
-          addMessage('bot', "Référence inconnue. Je lance une recherche web pour apprendre sa notice...");
-          const pdfUrl = await findNoticePDF(aiResponse.detectedReference);
+          addMessage('bot', `Je ne connais pas encore le ${ref}. Je lance une recherche web pour apprendre sa notice...`);
+          const pdfUrl = await findNoticePDF(ref);
           
           if (pdfUrl) {
-            addMessage('bot', "Notice trouvée ! Analyse flash en cours...");
+            addMessage('bot', "Notice trouvée sur le web ! Analyse flash en cours...");
             const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(pdfUrl)}`;
             const res = await fetch(proxyUrl);
             const blob = await res.blob();
             const text = await extractTextFromPDF(blob);
-            data = await analyzeNoticeText(text);
             
-            addMessage('bot', `Apprentissage terminé pour le modèle ${data.model}.`);
+            // Analyse et structuration par Gemini
+            const learnedData = await analyzeNoticeText(text);
+            console.log("Données apprises :", learnedData);
+
+            // --- SAUVEGARDE DANS SUPABASE ---
+            const { data: savedProduct, error } = await supabase
+              .from('products')
+              .upsert({ 
+                model: learnedData.model || ref, 
+                brand: learnedData.brand, 
+                category: learnedData.category 
+              })
+              .select()
+              .single();
+
+            if (!error && learnedData.error_codes) {
+              const codesToInsert = learnedData.error_codes.map(c => ({
+                product_id: savedProduct.id,
+                code: c.code,
+                description: c.description,
+                solution_pro: c.solution_pro,
+                solution_particulier: c.solution_particulier
+              }));
+              await supabase.from('error_codes').insert(codesToInsert);
+              addMessage('bot', `Le modèle ${ref} a été ajouté à ma base de connaissances pour les prochaines recherches.`);
+            }
+            data = learnedData;
           } else {
-            addMessage('bot', "Je n'ai pas trouvé de notice pour ce modèle. Je vais essayer de vous aider avec mes connaissances générales.");
+            addMessage('bot', "Impossible de trouver la notice officielle. Je vais essayer de vous répondre avec mes connaissances générales.");
           }
         }
         
-        // 3. Réponse finale basée sur les données techniques
+        // 3. Réponse finale basée sur les données techniques (locales ou apprises)
         const finalDiagnosis = await fetchFinalDiagnosis(userQuery, data);
         addMessage('bot', finalDiagnosis);
       } else {
-        // Trop vague, l'IA pose des questions
+        // Trop vague ou simple discussion
         addMessage('bot', aiResponse.text);
       }
     } catch (err) {
-      console.error(err);
-      addMessage('bot', "Désolé, j'ai rencontré une erreur. Pouvez-vous préciser la marque et le modèle ?");
+      console.error("Erreur ChatExpert:", err);
+      addMessage('bot', "Désolé, j'ai rencontré une erreur technique. Pouvez-vous préciser la marque et le modèle ?");
     } finally {
       setLoading(false);
     }
@@ -81,7 +108,7 @@ export const ExpertChat = () => {
         <Bot size={24} />
         <div>
           <h2 className="font-bold text-sm">Assistant Expert TechScan</h2>
-          <p className="text-[10px] opacity-80">Spécialiste Portail, Garage & Alarme</p>
+          <p className="text-[10px] opacity-80">Apprentissage automatique actif</p>
         </div>
       </div>
 
@@ -89,10 +116,10 @@ export const ExpertChat = () => {
       <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
         {messages.map((m, i) => (
           <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`max-w-[80%] p-3 rounded-2xl text-sm ${
+            <div className={`max-w-[80%] p-3 rounded-2xl text-sm shadow-sm ${
               m.role === 'user' 
                 ? 'bg-blue-600 text-white rounded-tr-none' 
-                : 'bg-white shadow-sm border border-gray-200 rounded-tl-none'
+                : 'bg-white text-gray-800 border border-gray-200 rounded-tl-none'
             }`}>
               {m.content}
             </div>
@@ -100,7 +127,7 @@ export const ExpertChat = () => {
         ))}
         {loading && (
           <div className="flex justify-start animate-pulse">
-            <div className="bg-gray-200 p-3 rounded-2xl">
+            <div className="bg-gray-200 p-3 rounded-2xl text-gray-500">
               <Loader2 className="animate-spin" size={16} />
             </div>
           </div>
@@ -113,13 +140,13 @@ export const ExpertChat = () => {
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="Décrivez la panne ou donnez une réf..."
-          className="flex-1 bg-gray-100 border-none rounded-full px-4 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+          placeholder="Posez votre question (ex: Panne E1 sur FAAC)..."
+          className="flex-1 bg-gray-100 border-none rounded-full px-4 py-2 text-sm text-gray-900 focus:ring-2 focus:ring-blue-500 outline-none"
         />
         <button 
           type="submit" 
           disabled={loading}
-          className="bg-blue-600 text-white p-2 rounded-full hover:bg-blue-700 disabled:bg-gray-400 transition-colors"
+          className="bg-blue-600 text-white p-2 rounded-full hover:bg-blue-700 disabled:bg-gray-400 transition-all active:scale-90"
         >
           <Send size={18} />
         </button>
